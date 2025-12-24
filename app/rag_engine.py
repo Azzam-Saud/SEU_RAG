@@ -49,6 +49,18 @@ def rag_llm_answer(query: str) -> str:
     response = client.responses.create(
         model="gpt-4o-mini",
         input=prompt
-    )
+        )
 
-    return response.output_text.strip()
+    # طريقة آمنة لاستخراج النص
+    output_text = ""
+    
+    for item in response.output:
+        if item["type"] == "message":
+            for c in item["content"]:
+                if c["type"] == "output_text":
+                    output_text += c["text"]
+    
+    if not output_text.strip():
+        return "لا أعلم."
+    
+    return output_text.strip()
