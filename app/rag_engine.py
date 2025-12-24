@@ -6,6 +6,20 @@ from sentence_transformers import SentenceTransformer
 from openai import OpenAI
 from app.config import OPENAI_API_KEY
 
+def extract_text(response) -> str:
+    output_text = ""
+
+    for item in response.output:
+        if item["type"] == "message":
+            for c in item["content"]:
+                if c["type"] == "output_text":
+                    output_text += c["text"]
+
+    if not output_text.strip():
+        return "لا أعلم."
+
+    return output_text.strip()
+
 @lru_cache(maxsize=1)
 def get_resources():
     model = SentenceTransformer(
