@@ -1,7 +1,6 @@
 import os, pickle, faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
-
 from loaders import extract_txt_from_files, extract_word, extract_excel
 from chunking import chunk_policy_qna_articles
 
@@ -46,7 +45,7 @@ texts = [c["text"] for c in chunked]
 ids = [c["id"] for c in chunked]
 
 # model = SentenceTransformer("intfloat/multilingual-e5-large")
-model = SentenceTransformer("intfloat/multilingual-e5-base")
+model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
 embs = model.encode(["passage: " + t for t in texts], show_progress_bar=True).astype("float32")
 
 faiss.normalize_L2(embs)
