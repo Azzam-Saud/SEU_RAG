@@ -45,7 +45,8 @@ for rec in records:
 texts = [c["text"] for c in chunked]
 ids = [c["id"] for c in chunked]
 
-model = SentenceTransformer("intfloat/multilingual-e5-large")
+# model = SentenceTransformer("intfloat/multilingual-e5-large")
+model = SentenceTransformer("intfloat/multilingual-e5-base")
 embs = model.encode(["passage: " + t for t in texts], show_progress_bar=True).astype("float32")
 
 faiss.normalize_L2(embs)
