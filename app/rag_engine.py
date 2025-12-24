@@ -2,8 +2,8 @@ import faiss, pickle
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from openai import OpenAI
-from app.config import OPENAI_API_KEY
 from functools import lru_cache
+from app.config import OPENAI_API_KEY
 
 @lru_cache(maxsize=1)
 def get_resources():
@@ -14,11 +14,10 @@ def get_resources():
     index = faiss.read_index("faiss.index")
     meta = pickle.load(open("meta.pkl", "rb"))
     return model, index, meta
-    
-meta = pickle.load(open("meta.pkl", "rb"))
-texts, ids = meta["texts"], meta["ids"]
+
 
 client = OpenAI(api_key=OPENAI_API_KEY)
+
 
 def search(query, k=10):
     model, index, meta = get_resources()
@@ -31,8 +30,12 @@ def search(query, k=10):
     ).astype("float32")
 
     D, I = index.search(q_emb, k)
-    return [{"score": float(D[0][i]), "text": texts[idx]} for i, idx in enumerate(I[0])]
-    
+
+    return [
+        {"score": float(D[0][i]), "text": texts[idx]}
+        for i, idx in enumerate(I[0])
+    ]
+
 def rag_llm_answer(query: str):
     results = search(query)
     context = "\n\n".join(r["text"] for r in results)
