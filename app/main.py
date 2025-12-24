@@ -24,7 +24,9 @@ def ask(q: Query):
         answer = rag_llm_answer(q.question)
         return {"answer": answer}
     except Exception as e:
+        # نرجّع الخطأ نصيًا
         return {
             "answer": "❌ خطأ داخلي",
-            "error": str(e)
+            "debug": repr(e)
         }
+
