@@ -7,10 +7,14 @@ async function send() {
   chat.innerHTML += `<div class="msg user">👤 ${input.value}</div>`;
 
   const res = await fetch("/ask", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question: input.value })
-  });
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    question: userInput
+  })
+});
 
   const data = await res.json();
 
