@@ -20,4 +20,11 @@ def home():
 
 @app.post("/ask")
 def ask(q: Query):
-    return {"answer": rag_llm_answer(q.question)}
+    try:
+        answer = rag_llm_answer(q.question)
+        return {"answer": answer}
+    except Exception as e:
+        return {
+            "answer": "❌ خطأ داخلي",
+            "error": str(e)
+        }
