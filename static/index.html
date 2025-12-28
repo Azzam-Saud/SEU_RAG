@@ -146,7 +146,6 @@ function formatAnswer(text) {
     .map(l => l.trim())
     .filter(l => l.length > 0);
 
-  // لو فيه تعداد واضح
   if (lines.length >= 4) {
     return `
       <ul>
@@ -155,7 +154,6 @@ function formatAnswer(text) {
     `;
   }
 
-  // غير كذا → فقرات
   return lines.map(l => `<p>${l}</p>`).join("");
 }
 

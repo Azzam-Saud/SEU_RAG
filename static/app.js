@@ -7,18 +7,14 @@ async function send() {
   chat.innerHTML += `<div class="msg user">👤 ${input.value}</div>`;
 
   const res = await fetch("/ask", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    question: userInput
-  })
-});
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question: input.value })
+  });
 
   const data = await res.json();
 
-  chat.innerHTML += `<div class="msg bot">🤖 ${data.answer}</div>`;
+  chat.innerHTML += `<div class="msg bot"> ${data.answer}</div>`;
   chat.scrollTop = chat.scrollHeight;
 
   input.value = "";
