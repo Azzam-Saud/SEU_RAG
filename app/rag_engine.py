@@ -1,16 +1,20 @@
+from functools import lru_cache
 from sentence_transformers import SentenceTransformer
 from openai import OpenAI
 from pinecone import Pinecone
 
 from app.config import OPENAI_API_KEY, PINECONE_API_KEY, PINECONE_INDEX_NAME
 
-model = SentenceTransformer("intfloat/multilingual-e5-large")
 client = OpenAI(api_key=OPENAI_API_KEY)
-
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(PINECONE_INDEX_NAME)
 
+@lru_cache(maxsize=1)
+def get_model():
+    return SentenceTransformer("intfloat/multilingual-e5-large")
+
 def search(query, k=15):
+    model = get_model()
     q_emb = model.encode(
         ["query: " + query],
         normalize_embeddings=True
@@ -28,8 +32,7 @@ def search(query, k=15):
         results.append({
             "score": float(match["score"]),
             "text": meta.get("preview", ""),
-            "source_id": meta.get("source_id"),
-            "id": meta.get("id")
+            "source_id": meta.get("source_id")
         })
 
     return results
@@ -57,3 +60,4 @@ def rag_llm_answer(query: str):
     )
 
     return res.choices[0].message.content.strip()
+    
