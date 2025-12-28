@@ -7,7 +7,6 @@ from app.rag_engine import rag_llm_answer
 
 app = FastAPI(title="SEU RAG API")
 
-# ربط ملفات الواجهة
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 class Query(BaseModel):
@@ -20,13 +19,4 @@ def home():
 
 @app.post("/ask")
 def ask(q: Query):
-    try:
-        answer = rag_llm_answer(q.question)
-        return {"answer": answer}
-    except Exception as e:
-        # نرجّع الخطأ نصيًا
-        return {
-            "answer": "❌ خطأ داخلي",
-            "debug": repr(e)
-        }
-
+    return {"answer": rag_llm_answer(q.question)}

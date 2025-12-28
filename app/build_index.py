@@ -1,12 +1,18 @@
-import os, pickle, faiss
-import numpy as np
+import hashlib
+import os
 from sentence_transformers import SentenceTransformer
-from loaders import extract_txt_from_files, extract_word, extract_excel
-from chunking import chunk_policy_qna_articles
+from pinecone import Pinecone, ServerlessSpec
 
-# DIR1 = r"D:\Azzam\Personal_Projects\SEU\filtered_data\Word_Excel"
-# DIR2 = r"D:\Azzam\Personal_Projects\SEU\filtered_data\txt"
-BASE_DIR = "data"
+
+from app.loaders import extract_txt_from_files, extract_word, extract_excel
+from app.chunking import chunk_policy_qna_articles
+from app.config import PINECONE_API_KEY, PINECONE_INDEX_NAME
+
+def safe_id(text: str) -> str:
+    return hashlib.md5(text.encode("utf-8")).hexdigest()
+
+# BASE_DIR = "data"
+BASE_DIR = r"D:\Azzam\Personal_Projects\SEU\filtered_data"
 DIR1 = os.path.join(BASE_DIR, "Word_Excel")
 DIR2 = os.path.join(BASE_DIR, "txt")
 
@@ -31,8 +37,8 @@ def process_dir(folder):
 process_dir(DIR1)
 process_dir(DIR2)
 
+# 🔹 Chunking
 chunked = []
-
 for rec in records:
     chunks = [rec["text"]] if rec["type"] == "excel" else chunk_policy_qna_articles(rec["text"])
     for i, ch in enumerate(chunks):
@@ -41,18 +47,49 @@ for rec in records:
             "text": ch
         })
 
+# 🔹 Embeddings
+model = SentenceTransformer("intfloat/multilingual-e5-large")
 texts = [c["text"] for c in chunked]
 ids = [c["id"] for c in chunked]
 
-# model = SentenceTransformer("intfloat/multilingual-e5-large")
-model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-embs = model.encode(["passage: " + t for t in texts], show_progress_bar=True).astype("float32")
+embs = model.encode(
+    ["passage: " + t for t in texts],
+    show_progress_bar=True,
+    normalize_embeddings=True
+)
 
-faiss.normalize_L2(embs)
-index = faiss.IndexFlatIP(embs.shape[1])
-index.add(embs)
+# 🔹 Pinecone
+pc = Pinecone(api_key=PINECONE_API_KEY)
 
-faiss.write_index(index, "faiss.index")
-pickle.dump({"texts": texts, "ids": ids}, open("meta.pkl", "wb"))
+if PINECONE_INDEX_NAME not in pc.list_indexes().names():
+    pc.create_index(
+        name=PINECONE_INDEX_NAME,
+        dimension=embs.shape[1],
+        metric="cosine",
+        spec=ServerlessSpec(
+            cloud="aws",
+            region="us-east-1"
+        )
+    )
 
-print("✅ Index built successfully")
+index = pc.Index(PINECONE_INDEX_NAME)
+
+# 🔹 Upsert
+MAX_META_CHARS = 2000
+
+vectors = [
+    {
+        "id": safe_id(ids[i]),
+        "values": embs[i].tolist(),
+        "metadata": {
+            "preview": texts[i][:MAX_META_CHARS],
+            "source_id": ids[i]
+        }
+    }
+    for i in range(len(ids))
+]
+
+
+index.upsert(vectors=vectors, batch_size=100)
+
+print("✅ Data uploaded to Pinecone successfully")
