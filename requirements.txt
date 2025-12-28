@@ -1,9 +1,5 @@
-fastapi==0.127.0
-uvicorn==0.40.0
-
-sentence-transformers==5.1.2
-torch==2.2.2
-
-pinecone==8.0.0
-openai==2.9.0
-python-dotenv==1.2.1
+fastapi
+uvicorn
+openai
+pinecone
+python-dotenv
