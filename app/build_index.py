@@ -1,17 +1,17 @@
 import hashlib
 import os
-from sentence_transformers import SentenceTransformer
+from openai import OpenAI
 from pinecone import Pinecone, ServerlessSpec
-
 
 from app.loaders import extract_txt_from_files, extract_word, extract_excel
 from app.chunking import chunk_policy_qna_articles
-from app.config import PINECONE_API_KEY, PINECONE_INDEX_NAME
+from app.config import PINECONE_API_KEY, PINECONE_INDEX_NAME, OPENAI_API_KEY
+
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 def safe_id(text: str) -> str:
     return hashlib.md5(text.encode("utf-8")).hexdigest()
 
-# BASE_DIR = "data"
 BASE_DIR = r"D:\Azzam\Personal_Projects\SEU\filtered_data"
 DIR1 = os.path.join(BASE_DIR, "Word_Excel")
 DIR2 = os.path.join(BASE_DIR, "txt")
@@ -47,16 +47,21 @@ for rec in records:
             "text": ch
         })
 
-# 🔹 Embeddings
-model = SentenceTransformer("intfloat/multilingual-e5-large")
 texts = [c["text"] for c in chunked]
 ids = [c["id"] for c in chunked]
 
-embs = model.encode(
-    ["passage: " + t for t in texts],
-    show_progress_bar=True,
-    normalize_embeddings=True
-)
+# 🔹 OpenAI Embeddings (1024 dims)
+def embed_texts(texts):
+    embeddings = []
+    for t in texts:
+        res = client.embeddings.create(
+            model="text-embedding-3-small",
+            input=t
+        )
+        embeddings.append(res.data[0].embedding)
+    return embeddings
+
+embs = embed_texts(texts)
 
 # 🔹 Pinecone
 pc = Pinecone(api_key=PINECONE_API_KEY)
@@ -64,7 +69,7 @@ pc = Pinecone(api_key=PINECONE_API_KEY)
 if PINECONE_INDEX_NAME not in pc.list_indexes().names():
     pc.create_index(
         name=PINECONE_INDEX_NAME,
-        dimension=embs.shape[1],
+        dimension=1024,
         metric="cosine",
         spec=ServerlessSpec(
             cloud="aws",
@@ -80,7 +85,7 @@ MAX_META_CHARS = 2000
 vectors = [
     {
         "id": safe_id(ids[i]),
-        "values": embs[i].tolist(),
+        "values": embs[i],
         "metadata": {
             "preview": texts[i][:MAX_META_CHARS],
             "source_id": ids[i]
@@ -88,7 +93,6 @@ vectors = [
     }
     for i in range(len(ids))
 ]
-
 
 index.upsert(vectors=vectors, batch_size=100)
 
