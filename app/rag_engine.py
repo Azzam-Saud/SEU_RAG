@@ -1,5 +1,8 @@
+from functools import lru_cache
+from sentence_transformers import SentenceTransformer
 from openai import OpenAI
 from pinecone import Pinecone
+
 from app.config import OPENAI_API_KEY, PINECONE_API_KEY, PINECONE_INDEX_NAME
 
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -7,36 +10,41 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(PINECONE_INDEX_NAME)
 
-def embed_query(text: str):
-    emb = client.embeddings.create(
-        model="text-embedding-3-large",
-        input=text
-    )
-    return emb.data[0].embedding
+@lru_cache(maxsize=1)
+def get_model():
+    return SentenceTransformer("intfloat/multilingual-e5-base")
 
 def search(query, k=15):
-    q_emb = embed_query(query)
+    model = get_model()
+
+    q_emb = model.encode(
+        ["query: " + query],
+        normalize_embeddings=True
+    )[0]
 
     res = index.query(
-        vector=q_emb,
+        vector=q_emb.tolist(),
         top_k=k,
         include_metadata=True
     )
 
-    return [
-        {
-            "score": match["score"],
-            "text": match["metadata"].get("preview", "")
-        }
-        for match in res["matches"]
-    ]
+    results = []
+    for match in res["matches"]:
+        meta = match.get("metadata", {})
+        results.append({
+            "score": float(match["score"]),
+            "text": meta.get("preview", ""),
+            "source_id": meta.get("source_id")
+        })
+
+    return results
 
 def rag_llm_answer(query: str):
     results = search(query)
     context = "\n\n".join(r["text"] for r in results)
 
     prompt = f"""
-أجب فقط من المستندات المتاحة
+أجب فقط من النصوص التالية.
 إذا لم تجد الإجابة قل: لا أعلم.
 
 السؤال:
