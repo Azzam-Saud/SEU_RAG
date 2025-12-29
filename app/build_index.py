@@ -95,4 +95,5 @@ vectors = [
 
 index.upsert(vectors=vectors, batch_size=100)
 
-print("✅ Index built & uploaded successfully (e5-base)")
+print("Index built & uploaded successfully")
+
