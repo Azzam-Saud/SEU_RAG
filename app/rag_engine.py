@@ -1,29 +1,36 @@
 from functools import lru_cache
-from sentence_transformers import SentenceTransformer
 from openai import OpenAI
 from pinecone import Pinecone
 
 from app.config import OPENAI_API_KEY, PINECONE_API_KEY, PINECONE_INDEX_NAME
 
-client = OpenAI(api_key=OPENAI_API_KEY)
 
+# ---------- Clients ----------
+client = OpenAI(api_key=OPENAI_API_KEY)
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(PINECONE_INDEX_NAME)
 
+
+# ---------- Embedding ----------
 @lru_cache(maxsize=1)
-def get_model():
-    return SentenceTransformer("intfloat/multilingual-e5-base")
+def get_embedding_model():
+    return "text-embedding-3-large"
 
+
+def embed_query(text: str):
+    res = client.embeddings.create(
+        model=get_embedding_model(),
+        input=text
+    )
+    return res.data[0].embedding
+
+
+# ---------- Search ----------
 def search(query, k=15):
-    model = get_model()
-
-    q_emb = model.encode(
-        ["query: " + query],
-        normalize_embeddings=True
-    )[0]
+    q_emb = embed_query(query)
 
     res = index.query(
-        vector=q_emb.tolist(),
+        vector=q_emb,
         top_k=k,
         include_metadata=True
     )
@@ -39,6 +46,8 @@ def search(query, k=15):
 
     return results
 
+
+# ---------- RAG ----------
 def rag_llm_answer(query: str):
     results = search(query)
     context = "\n\n".join(r["text"] for r in results)
