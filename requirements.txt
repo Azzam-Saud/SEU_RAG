@@ -1,5 +1,11 @@
 fastapi
 uvicorn
-openai
+sentence-transformers
+torch
 pinecone
+openai
 python-dotenv
+pydantic
+numpy
+pandas
+python-docx
