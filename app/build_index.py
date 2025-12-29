@@ -1,13 +1,11 @@
 import hashlib
 import os
-from openai import OpenAI
+from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone, ServerlessSpec
 
-from app.loaders import extract_txt_from_files, extract_word, extract_excel
-from app.chunking import chunk_policy_qna_articles
-from app.config import PINECONE_API_KEY, PINECONE_INDEX_NAME, OPENAI_API_KEY
-
-client = OpenAI(api_key=OPENAI_API_KEY)
+from loaders import extract_txt_from_files, extract_word, extract_excel
+from chunking import chunk_policy_qna_articles
+from config import PINECONE_API_KEY, PINECONE_INDEX_NAME
 
 def safe_id(text: str) -> str:
     return hashlib.md5(text.encode("utf-8")).hexdigest()
@@ -40,28 +38,29 @@ process_dir(DIR2)
 # 🔹 Chunking
 chunked = []
 for rec in records:
-    chunks = [rec["text"]] if rec["type"] == "excel" else chunk_policy_qna_articles(rec["text"])
+    chunks = (
+        [rec["text"]]
+        if rec["type"] == "excel"
+        else chunk_policy_qna_articles(rec["text"])
+    )
+
     for i, ch in enumerate(chunks):
         chunked.append({
-            "id": f'{rec["id"]}__chunk_{i}',
+            "id": f"{rec['id']}__chunk_{i}",
             "text": ch
         })
 
 texts = [c["text"] for c in chunked]
 ids = [c["id"] for c in chunked]
 
-# 🔹 OpenAI Embeddings (1024 dims)
-def embed_texts(texts):
-    embeddings = []
-    for t in texts:
-        res = client.embeddings.create(
-            model="text-embedding-3-small",
-            input=t
-        )
-        embeddings.append(res.data[0].embedding)
-    return embeddings
+# 🔹 Embeddings 
+model = SentenceTransformer("intfloat/multilingual-e5-base")
 
-embs = embed_texts(texts)
+embs = model.encode(
+    ["passage: " + t for t in texts],
+    normalize_embeddings=True,
+    show_progress_bar=True
+)
 
 # 🔹 Pinecone
 pc = Pinecone(api_key=PINECONE_API_KEY)
@@ -69,7 +68,7 @@ pc = Pinecone(api_key=PINECONE_API_KEY)
 if PINECONE_INDEX_NAME not in pc.list_indexes().names():
     pc.create_index(
         name=PINECONE_INDEX_NAME,
-        dimension=1024,
+        dimension=768,
         metric="cosine",
         spec=ServerlessSpec(
             cloud="aws",
@@ -85,7 +84,7 @@ MAX_META_CHARS = 2000
 vectors = [
     {
         "id": safe_id(ids[i]),
-        "values": embs[i],
+        "values": embs[i].tolist(),
         "metadata": {
             "preview": texts[i][:MAX_META_CHARS],
             "source_id": ids[i]
@@ -96,4 +95,4 @@ vectors = [
 
 index.upsert(vectors=vectors, batch_size=100)
 
-print("✅ Data uploaded to Pinecone successfully")
+print("✅ Index built & uploaded successfully (e5-base)")
