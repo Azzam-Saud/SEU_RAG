@@ -1,10 +1,8 @@
 import faiss
-import pickle
 import numpy as np
 from functools import lru_cache
-from openai import OpenAI
 from sentence_transformers import SentenceTransformer
-from app.config import OPENAI_API_KEY
+from openai import OpenAI
 
 INDEX_PATH = "faiss.index"
 META_PATH = "faiss_meta.pkl"
@@ -14,7 +12,12 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 @lru_cache(maxsize=1)
 def get_model():
     return SentenceTransformer("intfloat/multilingual-e5-base")
-
+def embed(texts):
+    model = get_model()
+    return model.encode(
+        ["passage: " + t for t in texts],
+        normalize_embeddings=True
+    )
 @lru_cache(maxsize=1)
 def load_index():
     index = faiss.read_index(INDEX_PATH)
@@ -70,5 +73,6 @@ def rag_llm_answer(query: str):
     )
 
     return res.choices[0].message.content.strip()
+
 
 
