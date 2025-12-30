@@ -2,7 +2,6 @@ import faiss
 import pickle
 import numpy as np
 from functools import lru_cache
-from sentence_transformers import SentenceTransformer
 from openai import OpenAI
 
 from app.config import OPENAI_API_KEY
@@ -71,3 +70,4 @@ def rag_llm_answer(query: str):
     )
 
     return res.choices[0].message.content.strip()
+
