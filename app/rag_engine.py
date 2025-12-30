@@ -1,59 +1,58 @@
+import faiss
+import pickle
+import numpy as np
 from functools import lru_cache
+from sentence_transformers import SentenceTransformer
 from openai import OpenAI
-from pinecone import Pinecone
 
-from app.config import OPENAI_API_KEY, PINECONE_API_KEY, PINECONE_INDEX_NAME
+from app.config import OPENAI_API_KEY
 
+INDEX_PATH = "faiss.index"
+META_PATH = "faiss_meta.pkl"
 
-# ---------- Clients ----------
 client = OpenAI(api_key=OPENAI_API_KEY)
-pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index(PINECONE_INDEX_NAME)
 
-
-# ---------- Embedding ----------
 @lru_cache(maxsize=1)
-def get_embedding_model():
-    return "text-embedding-3-large"
+def get_model():
+    return SentenceTransformer("intfloat/multilingual-e5-base")
 
+@lru_cache(maxsize=1)
+def load_index():
+    index = faiss.read_index(INDEX_PATH)
+    with open(META_PATH, "rb") as f:
+        meta = pickle.load(f)
+    return index, meta
 
-def embed_query(text: str):
-    res = client.embeddings.create(
-        model=get_embedding_model(),
-        input=text
-    )
-    return res.data[0].embedding
+def search(query, k=10):
+    model = get_model()
+    index, meta = load_index()
 
+    q_emb = model.encode(
+        ["query: " + query],
+        normalize_embeddings=True
+    ).astype("float32")
 
-# ---------- Search ----------
-def search(query, k=15):
-    q_emb = embed_query(query)
-
-    res = index.query(
-        vector=q_emb,
-        top_k=k,
-        include_metadata=True
-    )
+    scores, ids = index.search(q_emb, k)
 
     results = []
-    for match in res["matches"]:
-        meta = match.get("metadata", {})
+    for idx, score in zip(ids[0], scores[0]):
+        if idx == -1:
+            continue
         results.append({
-            "score": float(match["score"]),
-            "text": meta.get("preview", ""),
-            "source_id": meta.get("source_id")
+            "score": float(score),
+            "text": meta[idx]["text"],
+            "source_id": meta[idx]["id"]
         })
 
     return results
 
-
-# ---------- RAG ----------
 def rag_llm_answer(query: str):
-    results = search(query)
-    context = "\n\n".join(r["text"] for r in results)
+    docs = search(query)
+
+    context = "\n\n".join(d["text"] for d in docs)
 
     prompt = f"""
-أجب فقط من النصوص التالية.
+أجب فقط من السياق التالي.
 إذا لم تجد الإجابة قل: لا أعلم.
 
 السؤال:
@@ -67,7 +66,8 @@ def rag_llm_answer(query: str):
 
     res = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}]
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0
     )
 
     return res.choices[0].message.content.strip()
