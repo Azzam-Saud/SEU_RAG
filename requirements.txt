@@ -2,10 +2,8 @@ fastapi
 uvicorn
 
 sentence-transformers==2.6.1
-faiss-cpu
+faiss-cpu==1.7.4
 numpy
+
 python-dotenv
 openai
-
-# FORCE CPU TORCH
-torch==2.1.2+cpu
