@@ -1,7 +1,7 @@
-fastapi==0.127.0
-uvicorn==0.40.0
-openai==2.9.0
-pinecone==8.0.0
-python-dotenv==1.2.1
-pydantic==2.12.5
-starlette==0.50.0
+fastapi
+uvicorn
+sentence-transformers
+faiss-cpu
+numpy
+openai
+python-dotenv
