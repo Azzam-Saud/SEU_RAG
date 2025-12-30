@@ -3,7 +3,7 @@ import pickle
 import numpy as np
 from functools import lru_cache
 from openai import OpenAI
-
+from sentence_transformers import SentenceTransformer
 from app.config import OPENAI_API_KEY
 
 INDEX_PATH = "faiss.index"
@@ -70,4 +70,5 @@ def rag_llm_answer(query: str):
     )
 
     return res.choices[0].message.content.strip()
+
 
